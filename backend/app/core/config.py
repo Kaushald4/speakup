@@ -24,6 +24,11 @@ class Settings(BaseSettings):
     api_port: int = 8000
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
+    stun_urls: str = "stun:stun.l.google.com:19302"
+    turn_urls: str = ""
+    turn_username: str = ""
+    turn_credential: str = ""
+
     session_max_seconds: int = 300
     session_time_warning_seconds: int = 60
     session_ttl_seconds: int = 3600

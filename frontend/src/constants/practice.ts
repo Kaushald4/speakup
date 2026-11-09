@@ -33,6 +33,8 @@ export const LIVE_USER_MESSAGE_ID = "user-live";
 export const DEFAULT_SESSION_MAX_SECONDS = 300;
 export const SESSION_TIMER_TICK_MS = 500;
 export const FEEDBACK_ERROR_DISMISS_MS = 8000;
+export const WEBRTC_CONNECT_TIMEOUT_MS = 25000;
+export const DEFAULT_STUN_SERVER = "stun:stun.l.google.com:19302";
 
 export const VOICE_RING_DEFAULTS = {
   type: "ring",

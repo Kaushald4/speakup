@@ -8,8 +8,10 @@ import {
 import { SmallWebRTCTransport } from "@pipecat-ai/small-webrtc-transport";
 
 import {
+  DEFAULT_STUN_SERVER,
   IGNORED_BOT_OUTPUT_TYPES,
   LIVE_USER_MESSAGE_ID,
+  WEBRTC_CONNECT_TIMEOUT_MS,
 } from "@/constants/practice";
 import { joinTranscript, microphoneErrorMessage, turnsToMessages } from "@/lib/transcript";
 import { api } from "@/services/api";
@@ -44,6 +46,15 @@ export function useVoiceSession(options: {
   const pendingUserTextRef = useRef("");
   const processedTurnIdsRef = useRef<Set<string>>(new Set());
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const connectTimerRef = useRef<number | null>(null);
+  const connectTimedOutRef = useRef(false);
+
+  const clearConnectTimer = useCallback(() => {
+    if (connectTimerRef.current !== null) {
+      window.clearTimeout(connectTimerRef.current);
+      connectTimerRef.current = null;
+    }
+  }, []);
 
   const nextId = useCallback((prefix: string) => {
     counterRef.current += 1;
@@ -146,11 +157,16 @@ export function useVoiceSession(options: {
     if (clientRef.current || status === "connecting") return;
     setStatus("connecting");
     setError(null);
+    connectTimedOutRef.current = false;
     let pendingClient: PipecatClient | null = null;
 
     try {
       const connection = await api.connectSession(sessionId, token);
       const endpoint = apiUrl(connection.offer_url);
+      const iceServers =
+        connection.ice_servers?.length > 0
+          ? connection.ice_servers
+          : [{ urls: DEFAULT_STUN_SERVER }];
 
       const callbacks: RTVIEventCallbacks = {
         onConnected: () => setStatus("connected"),
@@ -174,7 +190,11 @@ export function useVoiceSession(options: {
         onUserStoppedSpeaking: () => setUserSpeaking(false),
         onUserInput: handleUserInput,
         onBotOutput: handleBotOutput,
-        onTrackStarted: (track) => attachRemoteAudio(track),
+        onTrackStarted: (track, participant) => {
+          // The media manager also emits local mic tracks; playing those would echo the user.
+          if (participant?.local) return;
+          attachRemoteAudio(track);
+        },
         onDeviceError: (deviceError) => {
           setError(microphoneErrorMessage(deviceError.type));
           setStatus("error");
@@ -187,31 +207,55 @@ export function useVoiceSession(options: {
       };
 
       const client = new PipecatClient({
-        transport: new SmallWebRTCTransport({
-          iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-        }),
+        transport: new SmallWebRTCTransport({ iceServers }),
         enableMic: true,
         enableCam: false,
         callbacks,
       });
       pendingClient = client;
       clientRef.current = client;
+
+      connectTimerRef.current = window.setTimeout(() => {
+        connectTimedOutRef.current = true;
+        setError(
+          "Could not establish the voice connection. The network may require a TURN relay.",
+        );
+        setStatus("error");
+        const timedOutClient = clientRef.current;
+        clientRef.current = null;
+        timedOutClient?.disconnect().catch(() => undefined);
+      }, WEBRTC_CONNECT_TIMEOUT_MS);
+
       await client.connect({
         webrtcRequestParams: { endpoint, headers: sessionAuthHeaders(token) },
       });
+      clearConnectTimer();
       setStatus("connected");
     } catch (exc) {
-      const message = exc instanceof Error ? exc.message : "Could not start the voice session.";
-      setError(message);
-      setStatus("error");
+      clearConnectTimer();
+      if (!connectTimedOutRef.current) {
+        const message =
+          exc instanceof Error ? exc.message : "Could not start the voice session.";
+        setError(message);
+        setStatus("error");
+      }
       clientRef.current = null;
       if (pendingClient) {
         pendingClient.disconnect().catch(() => undefined);
       }
     }
-  }, [handleBotOutput, handleUserInput, attachRemoteAudio, sessionId, status, token]);
+  }, [
+    attachRemoteAudio,
+    clearConnectTimer,
+    handleBotOutput,
+    handleUserInput,
+    sessionId,
+    status,
+    token,
+  ]);
 
   const disconnect = useCallback(async () => {
+    clearConnectTimer();
     setStatus("ended");
     setRemoteStream(null);
     const client = clientRef.current;
@@ -223,7 +267,7 @@ export function useVoiceSession(options: {
         // Connection may already be closed by the server.
       }
     }
-  }, []);
+  }, [clearConnectTimer]);
 
   const toggleMic = useCallback(() => {
     const client = clientRef.current;
@@ -244,13 +288,14 @@ export function useVoiceSession(options: {
 
   useEffect(() => {
     return () => {
+      clearConnectTimer();
       const client = clientRef.current;
       clientRef.current = null;
       if (client) {
         client.disconnect().catch(() => undefined);
       }
     };
-  }, []);
+  }, [clearConnectTimer]);
 
   return {
     status,

@@ -104,11 +104,18 @@ export interface CreateSessionResponse {
   max_duration_seconds: number;
 }
 
+export interface IceServerConfig {
+  urls: string | string[];
+  username?: string;
+  credential?: string;
+}
+
 export interface ConnectResponse {
   session_id: string;
   offer_url: string;
   max_duration_seconds: number;
   remaining_seconds: number;
+  ice_servers: IceServerConfig[];
 }
 
 export interface Health {

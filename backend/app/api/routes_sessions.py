@@ -6,8 +6,10 @@ from fastapi import APIRouter, Header, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from app.core.container import AppServices
+from app.core.ice import ice_server_config
 from app.models.domain import SessionStatus
 from app.schemas.api import (
+    ConnectResponse,
     CreateSessionRequest,
     CreateSessionResponse,
     EndSessionResponse,
@@ -68,10 +70,10 @@ async def get_session(
     return SessionDetailOut.from_session(session)
 
 
-@router.post("/{session_id}/connect")
+@router.post("/{session_id}/connect", response_model=ConnectResponse)
 async def connect_session(
     session_id: str, request: Request, x_session_token: SessionToken = None
-) -> dict:
+) -> ConnectResponse:
     app_services = services(request)
     await authorized(request, session_id, x_session_token)
     if not app_services.settings.voice_ready:
@@ -83,12 +85,13 @@ async def connect_session(
             ),
         )
     session = await app_services.sessions.prepare_connection(session_id)
-    return {
-        "session_id": session.id,
-        "offer_url": f"/api/offer?session_id={session.id}",
-        "max_duration_seconds": session.max_duration_seconds,
-        "remaining_seconds": session.remaining_seconds(),
-    }
+    return ConnectResponse(
+        session_id=session.id,
+        offer_url=f"/api/offer?session_id={session.id}",
+        max_duration_seconds=session.max_duration_seconds,
+        remaining_seconds=session.remaining_seconds(),
+        ice_servers=ice_server_config(app_services.settings),
+    )
 
 
 @router.post("/{session_id}/end", response_model=EndSessionResponse)

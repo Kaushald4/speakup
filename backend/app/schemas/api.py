@@ -117,6 +117,20 @@ class EndSessionResponse(BaseModel):
     session: SessionOut
 
 
+class IceServerOut(BaseModel):
+    urls: list[str]
+    username: str | None = None
+    credential: str | None = None
+
+
+class ConnectResponse(BaseModel):
+    session_id: str
+    offer_url: str
+    max_duration_seconds: int
+    remaining_seconds: int
+    ice_servers: list[IceServerOut]
+
+
 class HealthOut(BaseModel):
     status: str
     voice_ready: bool

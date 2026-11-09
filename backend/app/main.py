@@ -12,6 +12,7 @@ from pipecat.transports.smallwebrtc.request_handler import SmallWebRTCRequestHan
 from app.api import routes_health, routes_sessions, routes_topics, routes_webrtc
 from app.core.config import REPO_ROOT, Settings, get_settings
 from app.core.container import build_services
+from app.core.ice import aiortc_ice_servers
 from app.services.session_service import (
     ReportNotReadyError,
     SessionAccessDeniedError,
@@ -40,7 +41,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def lifespan(app: FastAPI):
         app_services = build_services(resolved)
         app.state.services = app_services
-        app.state.webrtc_handler = SmallWebRTCRequestHandler()
+        app.state.webrtc_handler = SmallWebRTCRequestHandler(
+            ice_servers=aiortc_ice_servers(resolved)
+        )
         cleanup_task = asyncio.create_task(_cleanup_loop(app_services))
         if resolved.missing_provider_env:
             logger.warning(

@@ -70,6 +70,9 @@ def test_session_flow_and_token_protection():
         )
         assert connected.status_code == 200
         assert connected.json()["offer_url"].startswith("/api/offer")
+        assert connected.json()["ice_servers"][0]["urls"] == [
+            "stun:stun.l.google.com:19302"
+        ]
 
         early_report = client.get(
             f"/api/sessions/{session_id}/report", headers={"X-Session-Token": token}
