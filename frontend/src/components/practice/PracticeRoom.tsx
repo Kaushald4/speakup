@@ -10,7 +10,7 @@ import { PracticeHeader } from "@/components/practice/PracticeHeader";
 import { SessionControls } from "@/components/practice/SessionControls";
 import { TutorStage } from "@/components/practice/TutorStage";
 import { TranscriptPanel } from "@/components/transcript/TranscriptPanel";
-import { DEFAULT_SESSION_MAX_SECONDS, PRACTICE_COPY } from "@/constants/practice";
+import { DEFAULT_SESSION_MAX_SECONDS } from "@/constants/practice";
 import { usePracticeSession } from "@/hooks/practice/usePracticeSession";
 import type { SessionDetail } from "@/types/api";
 
